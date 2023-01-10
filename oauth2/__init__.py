@@ -24,6 +24,7 @@ THE SOFTWARE.
 
 import base64
 from hashlib import sha1
+from hashlib import sha256
 import time
 import random
 import hmac
@@ -818,6 +819,34 @@ class SignatureMethod(object):
         the given consumer and token signing the given request."""
         built = self.sign(request, consumer, token)
         return built == signature
+
+class SignatureMethod_HMAC_SHA256(SignatureMethod):
+    name = 'HMAC-SHA256'
+
+    def signing_base(self, request, consumer, token):
+        if (not hasattr(request, 'normalized_url') or request.normalized_url is None):
+            raise ValueError("Base URL for request is not set.")
+
+        sig = (
+            escape(request.method),
+            escape(request.normalized_url),
+            escape(request.get_normalized_parameters()),
+        )
+
+        key = '%s&' % escape(consumer.secret)
+        if token:
+            key += escape(token.secret)
+        raw = '&'.join(sig)
+        return key.encode('ascii'), raw.encode('ascii')
+
+    def sign(self, request, consumer, token):
+        """Builds the base signature string."""
+        key, raw = self.signing_base(request, consumer, token)
+
+        hashed = hmac.new(key, raw, sha256)
+
+        # Calculate the digest base 64.
+        return binascii.b2a_base64(hashed.digest())[:-1]
 
 
 class SignatureMethod_HMAC_SHA1(SignatureMethod):
